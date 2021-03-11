@@ -31,7 +31,7 @@ import numpy as np
 import os
 import io
 import time
-import tokenize
+import tokenize as tokenize_lib
 
 DB_FILE = '/home/HDD/code_and_comments/all_data.db'
 NUM_EXAMPLES = 10000
@@ -65,7 +65,7 @@ def preprocess_sentence(w):
     return w
 
 def tokenize_python(code_snippet, genaraic_vars = True):
-    tokens = tokenize.tokenize(io.BytesIO(code_snippet.encode('utf-8')).readline)
+    tokens = tokenize_lib.tokenize(io.BytesIO(code_snippet.encode('utf-8')).readline)
     parsed = []
     parsed.append('<start>')
 
@@ -116,7 +116,7 @@ def tokenize_python(code_snippet, genaraic_vars = True):
 
 def tokenize(lang):
     lang_tokenizer = tf.keras.preprocessing.text.Tokenizer(
-            filters=' ')
+            filters=' ', num_words=30000)
     lang_tokenizer.fit_on_texts(lang)
 
     tensor = lang_tokenizer.texts_to_sequences(lang)
@@ -350,7 +350,7 @@ def translate(sentence):
 
 def main():
     # Wouldn't normally do this but don't want to rewrite everything
-    global encoder, targ_lang, decoder, loss_object
+    global encoder, targ_lang, decoder, loss_object, optimizer
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     # Filter down to short-ish python examples
