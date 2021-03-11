@@ -33,7 +33,8 @@ import io
 import time
 import tokenize as tokenize_lib
 
-DB_FILE = '/home/HDD/code_and_comments/all_data.db'
+DB_FILE = '/home/jcp353/all_data.db'
+DB_FILE2 = '/home/HDD/code_and_comments/all_data.db'
 NUM_EXAMPLES = 10000
 SPLIT = 8000
 EXAMPLE_LENGTH_CAP = 200
@@ -350,8 +351,13 @@ def translate(sentence):
 
 def main():
     # Wouldn't normally do this but don't want to rewrite everything
-    global encoder, targ_lang, decoder, loss_object, optimizer
-    conn = sqlite3.connect(DB_FILE)
+    global encoder, targ_lang, decoder, loss_object, optimizer,\
+            max_length_targ, max_length_inp, inp_lang, enc_hidden
+    # Lazy workaround for 2 computers
+    try:
+        conn = sqlite3.connect(DB_FILE)
+    except:
+        conn = sqlite3.connect(DB_FILE2)
     c = conn.cursor()
     # Filter down to short-ish python examples
     pairs = c.execute('SELECT * FROM all_data WHERE filename LIKE "%.py" AND ' +
@@ -364,8 +370,10 @@ def main():
     print(preprocess_sentence(target_sentence))
     print(preprocess_sentence(source_sentence).encode('utf-8'))
 
-    target = [preprocess_sentence(i[1]) for i in pairs]
-    source = [preprocess_sentence(i[0]) for i in pairs]
+    #target = [preprocess_sentence(i[1]) for i in pairs]
+    #source = [preprocess_sentence(i[0]) for i in pairs]
+    target = [tokenize_python(i[1]) for i in pairs]
+    source = [tokenize_python(i[0]) for i in pairs]
     input_tensor, target_tensor, inp_lang, targ_lang = load_dataset(target, source, NUM_EXAMPLES)
 
     # Calculate max_length of the target tensors
@@ -391,9 +399,11 @@ def main():
     convert(targ_lang, target_tensor_train[0])
 
     config = tf.compat.v1.ConfigProto()
-    # dynamically grow GPU memory
+    # Dynamically grow GPU memory
     config.gpu_options.allow_growth = True
     set_session(tf.compat.v1.Session(config=config))
+    # Second attempt at it
+    tf.config.gpu.set_per_process_memory_fraction(0.9)
     BUFFER_SIZE = len(input_tensor_train)
     steps_per_epoch = len(input_tensor_train)//BATCH_SIZE
     embedding_dim = 256
