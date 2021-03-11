@@ -41,6 +41,14 @@ EXAMPLE_LENGTH_CAP = 200
 EPOCHS = 6
 BATCH_SIZE = 128
 
+key_words = ['False','await','else','import','pass',
+            'None','break','except','in','raise',
+            'True','class','finally','is','return',
+            'and','continue','for','lambda','try',
+            'as','def','from','nonlocal','while',
+            'assert','del','global','not','with',
+            'async','elif','if','or','yield']
+
 # Converts the unicode file to ascii
 def unicode_to_ascii(s):
     return ''.join(c for c in unicodedata.normalize('NFD', s)
@@ -66,54 +74,57 @@ def preprocess_sentence(w):
     return w
 
 def tokenize_python(code_snippet, genaraic_vars = True):
-    tokens = tokenize_lib.tokenize(io.BytesIO(code_snippet.encode('utf-8')).readline)
-    parsed = []
-    parsed.append('<start>')
+    try:
+        tokens = tokenize_lib.tokenize(io.BytesIO(code_snippet.encode('utf-8')).readline)
+        parsed = []
+        parsed.append('<start>')
 
-    #for keeping track of variables
-    variables = []
-    var_count=0
+        #for keeping track of variables
+        variables = []
+        var_count=0
 
-    for token in tokens:
+        for token in tokens:
 
-        if token.type not in [0,57,58,59,60,61,62,63,256]:
-            #print('----')
-            #print(token.type, token.string)
-            #print(token)
+            if token.type not in [0,57,58,59,60,61,62,63,256]:
+                #print('----')
+                #print(token.type, token.string)
+                #print(token)
 
-            #keyword or variable
-            if token.type == 1 and genaraic_vars:
+                #keyword or variable
+                if token.type == 1 and genaraic_vars:
 
-                #key word
-                if token.string in key_words:
+                    #key word
+                    if token.string in key_words:
+                        parsed.append(token.string)
+
+                    #variable
+                    else:
+                        #new var
+                        if token.string not in variables:
+                            var_count+=1
+                            parsed.append('var_'+str(var_count))
+                            variables.append(token.string)
+                        else:
+                            parsed.append('var_'+str(variables.index(token.string)))
+
+
+                #string
+                elif token.type == 2:
+                    parsed.append('<number>')
+
+                #number
+                elif token.type == 3:
+                    parsed.append('<string>')
+
+                #everything else
+                else:
                     parsed.append(token.string)
 
-                #variable
-                else:
-                    #new var
-                    if token.string not in variables:
-                        var_count+=1
-                        parsed.append('var_'+str(var_count))
-                        variables.append(token.string)
-                    else:
-                        parsed.append('var_'+str(variables.index(token.string)))
 
-
-            #string
-            elif token.type == 2:
-                parsed.append('<number>')
-
-            #number
-            elif token.type == 3:
-                parsed.append('<string>')
-
-            #everything else
-            else:
-                parsed.append(token.string)
-
-
-    parsed.append('<end>')
-    return parsed
+        parsed.append('<end>')
+        return parsed
+    except:
+        return None
 
 def tokenize(lang):
     lang_tokenizer = tf.keras.preprocessing.text.Tokenizer(
@@ -372,8 +383,15 @@ def main():
 
     #target = [preprocess_sentence(i[1]) for i in pairs]
     #source = [preprocess_sentence(i[0]) for i in pairs]
-    target = [tokenize_python(i[1]) for i in pairs]
     source = [tokenize_python(i[0]) for i in pairs]
+    target = [preprocess_sentence(i[1]) for i in pairs]
+    # Very quick and dirty removal of errored input
+    filter_out = [i for i,y in enumerate(source) if y is None]
+    for i in range(len(source)):
+        if i in filter_out:
+            target[i] = None
+    source = list(filter(None, source))
+    target = list(filter(None, target))
     input_tensor, target_tensor, inp_lang, targ_lang = load_dataset(target, source, NUM_EXAMPLES)
 
     # Calculate max_length of the target tensors
@@ -402,8 +420,6 @@ def main():
     # Dynamically grow GPU memory
     config.gpu_options.allow_growth = True
     set_session(tf.compat.v1.Session(config=config))
-    # Second attempt at it
-    tf.config.gpu.set_per_process_memory_fraction(0.9)
     BUFFER_SIZE = len(input_tensor_train)
     steps_per_epoch = len(input_tensor_train)//BATCH_SIZE
     embedding_dim = 256
