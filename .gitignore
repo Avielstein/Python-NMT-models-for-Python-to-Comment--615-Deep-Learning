@@ -1,2 +1,4 @@
 .ipynb_checkpoints/
 training_checkpoints/
+training_checkpoints.bak/
+*.png

@@ -35,11 +35,11 @@ import tokenize as tokenize_lib
 
 DB_FILE = '/home/jcp353/all_data.db'
 DB_FILE2 = '/home/HDD/code_and_comments/all_data.db'
-NUM_EXAMPLES = 10000
-SPLIT = 8000
-EXAMPLE_LENGTH_CAP = 200
-EPOCHS = 6
-BATCH_SIZE = 128
+NUM_EXAMPLES = 30000
+SPLIT = int(NUM_EXAMPLES * 0.8)
+EXAMPLE_LENGTH_CAP = 300
+EPOCHS = 10
+BATCH_SIZE = 32
 
 key_words = ['False','await','else','import','pass',
             'None','break','except','in','raise',
@@ -73,7 +73,7 @@ def preprocess_sentence(w):
     w = '<start> ' + w + ' <end>'
     return w
 
-def tokenize_python(code_snippet, genaraic_vars = True):
+def tokenize_python(code_snippet, genaraic_vars = False):
     try:
         tokens = tokenize_lib.tokenize(io.BytesIO(code_snippet.encode('utf-8')).readline)
         parsed = []
@@ -298,9 +298,13 @@ def train_step(inp, targ, enc_hidden):
 def evaluate(sentence):
     attention_plot = np.zeros((max_length_targ, max_length_inp))
 
-    sentence = preprocess_sentence(sentence)
+    sentence = tokenize_python(sentence)
 
-    inputs = [inp_lang.word_index[i] for i in sentence.split(' ')]
+    #print(inp_lang.word_index)
+    #print(sentence)
+    #exit(0)
+    inputs = [inp_lang.word_index[i] for i in sentence]
+    #inputs = sentence
     inputs = tf.keras.preprocessing.sequence.pad_sequences([inputs],
              maxlen=max_length_inp,
              padding='post')
@@ -348,7 +352,8 @@ def plot_attention(attention, sentence, predicted_sentence):
     ax.xaxis.set_major_locator(ticker.MultipleLocator(1))
     ax.yaxis.set_major_locator(ticker.MultipleLocator(1))
 
-    plt.show()
+    #plt.show()
+    plt.savefig('figure.png')
 
 def translate(sentence):
     result, sentence, attention_plot = evaluate(sentence)
@@ -356,14 +361,15 @@ def translate(sentence):
     print('Input: %s' % (sentence))
     print('Predicted translation: {}'.format(result))
 
-    attention_plot = attention_plot[:len(result.split(' ')), :len(sentence.split(' '))]
-    plot_attention(attention_plot, sentence.split(' '), result.split(' '))
+    attention_plot = attention_plot[:len(result.split(' ')), :len(sentence)]
+    plot_attention(attention_plot, sentence, result.split(' '))
 
 
 def main():
     # Wouldn't normally do this but don't want to rewrite everything
     global encoder, targ_lang, decoder, loss_object, optimizer,\
-            max_length_targ, max_length_inp, inp_lang, enc_hidden
+            max_length_targ, max_length_inp, inp_lang, enc_hidden,\
+            units
     # Lazy workaround for 2 computers
     try:
         conn = sqlite3.connect(DB_FILE)
