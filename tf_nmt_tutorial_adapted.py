@@ -33,13 +33,30 @@ import io
 import time
 import tokenize as tokenize_lib
 
+# There's two because I'm using two computer,
+# you can ignore the second one
 DB_FILE = '/home/jcp353/all_data.db'
 DB_FILE2 = '/home/HDD/code_and_comments/all_data.db'
+# Number of python code comment pairs
 NUM_EXAMPLES = 30000
+# Training evaluation split
 SPLIT = int(NUM_EXAMPLES * 0.8)
+# A cap on the length of the python code and comment
+# examples. All those chosen will be less than or
+# equal to this many characters.
 EXAMPLE_LENGTH_CAP = 300
 EPOCHS = 10
-BATCH_SIZE = 32
+BATCH_SIZE = 64
+# Keeps only this many of the most common words,
+# everything else will qualify as unknown
+NUM_WORDS = 10000
+# Sets how much of the GPU to use, I was having
+# trouble at 1.0 but you can set it to that if
+# that works for you
+MEM_FRAC = 0.98
+# Neural net dimensions/units
+EMBEDDING_DIM = 256
+UNITS = 512
 
 key_words = ['False','await','else','import','pass',
             'None','break','except','in','raise',
@@ -128,7 +145,7 @@ def tokenize_python(code_snippet, genaraic_vars = False):
 
 def tokenize(lang):
     lang_tokenizer = tf.keras.preprocessing.text.Tokenizer(
-            filters=' ', num_words=30000)
+            filters=' ', num_words=NUM_WORDS)
     lang_tokenizer.fit_on_texts(lang)
 
     tensor = lang_tokenizer.texts_to_sequences(lang)
@@ -422,14 +439,31 @@ def main():
     print ("Target Language; index to word mapping")
     convert(targ_lang, target_tensor_train[0])
 
-    config = tf.compat.v1.ConfigProto()
+    #config = tf.compat.v1.ConfigProto()
     # Dynamically grow GPU memory
+    #config.gpu_options.allow_growth = True
+    #gpus = tf.config.experimental.list_physical_devices('GPU')
+    #print(gpus)
+    #if gpus:
+        #try:
+        #tf.config.experimental.set_virtual_device_configuration(gpus[0], [tf.config.experimental.VirtualDeviceConfiguration(per_process_gpu_memory_fraction=0.8)])
+        #tf.config.experimental.set_virtual_device_configuration(gpus[1], [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=7000)])
+        #except RuntimeError as e:
+            #print(e)
+    #set_session(tf.compat.v1.Session(config=config))
+    from tensorflow.compat.v1 import ConfigProto
+    from tensorflow.compat.v1 import InteractiveSession
+
+    config = ConfigProto()
+    config.gpu_options.per_process_gpu_memory_fraction = MEM_FRAC
     config.gpu_options.allow_growth = True
-    set_session(tf.compat.v1.Session(config=config))
+    session = InteractiveSession(config=config)
     BUFFER_SIZE = len(input_tensor_train)
     steps_per_epoch = len(input_tensor_train)//BATCH_SIZE
-    embedding_dim = 256
-    units = 1024
+    #embedding_dim = 256
+    #units = 1024
+    embedding_dim = EMBEDDING_DIM
+    units = UNITS
     vocab_inp_size = len(inp_lang.word_index)+1
     vocab_tar_size = len(targ_lang.word_index)+1
 
