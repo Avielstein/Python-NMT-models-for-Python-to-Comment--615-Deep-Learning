@@ -57,6 +57,8 @@ MEM_FRAC = 0.98
 # Neural net dimensions/units
 EMBEDDING_DIM = 256
 UNITS = 512
+for i in range(100):
+    print
 
 key_words = ['False','await','else','import','pass',
             'None','break','except','in','raise',
@@ -90,17 +92,25 @@ def preprocess_sentence(w):
     w = '<start> ' + w + ' <end>'
     return w
 
-def tokenize_python(code_snippet, genaraic_vars = False):
+def tokenize_python(code_snippet, genaraic_vars = False, fail=True):
+    tokens = tokenize_lib.tokenize(io.BytesIO(code_snippet.encode('utf-8')).readline)
+    if not fail:
+        tokens2 = []
+        while True:
+            try:
+                tokens2.append(tokens.__next__())
+            except:
+                break
+    else:
+        tokens2 = tokens
+    parsed = []
+    parsed.append('<start>')
+
+    #for keeping track of variables
+    variables = []
+    var_count=0
     try:
-        tokens = tokenize_lib.tokenize(io.BytesIO(code_snippet.encode('utf-8')).readline)
-        parsed = []
-        parsed.append('<start>')
-
-        #for keeping track of variables
-        variables = []
-        var_count=0
-
-        for token in tokens:
+        for token in tokens2:
 
             if token.type not in [0,57,58,59,60,61,62,63,256]:
                 #print('----')
@@ -315,13 +325,10 @@ def train_step(inp, targ, enc_hidden):
 def evaluate(sentence):
     attention_plot = np.zeros((max_length_targ, max_length_inp))
 
-    sentence = tokenize_python(sentence)
-
-    #print(inp_lang.word_index)
-    #print(sentence)
-    #exit(0)
+    sentence = tokenize_python(sentence, fail=False)
+    keys = inp_lang.word_index.keys()
+    sentence = [' ' if x not in keys else x for x in sentence]
     inputs = [inp_lang.word_index[i] for i in sentence]
-    #inputs = sentence
     inputs = tf.keras.preprocessing.sequence.pad_sequences([inputs],
              maxlen=max_length_inp,
              padding='post')
@@ -357,6 +364,8 @@ def evaluate(sentence):
 
 # function for plotting the attention weights
 def plot_attention(attention, sentence, predicted_sentence):
+    # Temporarily disabling
+    return None
     fig = plt.figure(figsize=(10,10))
     ax = fig.add_subplot(1, 1, 1)
     ax.matshow(attention, cmap='viridis')
@@ -508,6 +517,7 @@ def main():
     checkpoint = tf.train.Checkpoint(optimizer=optimizer,
             encoder=encoder, decoder=decoder)
 
+    """
     for epoch in range(EPOCHS):
         start = time.time()
 
@@ -529,9 +539,26 @@ def main():
             total_loss / steps_per_epoch))
         print('Time taken for 1 epoch {} sec\n'.format(time.time() - start))
     # restoring the latest checkpoint in checkpoint_dir
+    """
     checkpoint.restore(tf.train.latest_checkpoint(checkpoint_dir))
 
-    translate(u'print("Hello, world!")')
+    #translate(u'print("Hello, world!")')
+    #sent = """
+    #    def __init__(self, inputCol=None, outputCol=None):
+#
+#                super(DutchAnalyzerLucene, self).__init__()
+#                kwargs = self._input_kwargs
+#                self.setParams(**kwargs)
+#            """
+    #sent = u'{0}'.format(pairs[0][0])
+    #translate(sent)
+
+    for i in range(SPLIT+1, SPLIT+101):
+        sent = pairs[i][0]
+        #try:
+        translate(sent)
+        #except TypeError:
+            #print('Error: Could not tokenize')
 
 if __name__ == '__main__':
     main()
