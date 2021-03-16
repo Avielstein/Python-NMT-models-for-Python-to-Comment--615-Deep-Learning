@@ -38,15 +38,15 @@ import tokenize as tokenize_lib
 DB_FILE = '/home/jcp353/all_data.db'
 DB_FILE2 = '/home/HDD/code_and_comments/all_data.db'
 # Number of python code comment pairs
-NUM_EXAMPLES = 30000
+NUM_EXAMPLES = 1.1e6
 # Training evaluation split
 SPLIT = int(NUM_EXAMPLES * 0.8)
 # A cap on the length of the python code and comment
 # examples. All those chosen will be less than or
 # equal to this many characters.
 EXAMPLE_LENGTH_CAP = 300
-EPOCHS = 10
-BATCH_SIZE = 64
+EPOCHS = 50
+BATCH_SIZE = 128
 # Keeps only this many of the most common words,
 # everything else will qualify as unknown
 NUM_WORDS = 10000
@@ -56,7 +56,7 @@ NUM_WORDS = 10000
 MEM_FRAC = 0.98
 # Neural net dimensions/units
 EMBEDDING_DIM = 256
-UNITS = 512
+UNITS = 1024
 for i in range(100):
     print
 
