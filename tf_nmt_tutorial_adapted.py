@@ -1,23 +1,11 @@
 #!/usr/bin/env python
-# coding: utf-8
-
-# ##### Copyright 2019 The TensorFlow Authors.
-#@title Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-# https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
 
 # Adapted from https://www.tensorflow.org/tutorials/text/nmt_with_attention
 
 import tensorflow as tf
 from tensorflow.compat.v1.keras.backend import set_session
+from tensorflow.compat.v1 import ConfigProto
+from tensorflow.compat.v1 import InteractiveSession
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
@@ -38,7 +26,7 @@ import tokenize as tokenize_lib
 DB_FILE = '/home/jcp353/all_data.db'
 DB_FILE2 = '/home/HDD/code_and_comments/all_data.db'
 # Number of python code comment pairs
-NUM_EXAMPLES = 1.1e6
+NUM_EXAMPLES = 25000
 # Training evaluation split
 SPLIT = int(NUM_EXAMPLES * 0.8)
 # A cap on the length of the python code and comment
@@ -57,8 +45,6 @@ MEM_FRAC = 0.98
 # Neural net dimensions/units
 EMBEDDING_DIM = 256
 UNITS = 1024
-for i in range(100):
-    print
 
 key_words = ['False','await','else','import','pass',
             'None','break','except','in','raise',
@@ -113,10 +99,6 @@ def tokenize_python(code_snippet, genaraic_vars = False, fail=True):
         for token in tokens2:
 
             if token.type not in [0,57,58,59,60,61,62,63,256]:
-                #print('----')
-                #print(token.type, token.string)
-                #print(token)
-
                 #keyword or variable
                 if token.type == 1 and genaraic_vars:
 
@@ -270,16 +252,6 @@ def loss_function(real, pred):
 
     return tf.reduce_mean(loss_)
 
-# ## Training
-# 
-# 1. Pass the *input* through the *encoder* which return *encoder output* and the *encoder hidden state*.
-# 2. The encoder output, encoder hidden state and the decoder input (which is the *start token*) is passed to the decoder.
-# 3. The decoder returns the *predictions* and the *decoder hidden state*.
-# 4. The decoder hidden state is then passed back into the model and the predictions are used to calculate the loss.
-# 5. Use *teacher forcing* to decide the next input to the decoder.
-# 6. *Teacher forcing* is the technique where the *target word* is passed as the *next input* to the decoder.
-# 7. The final step is to calculate the gradients and apply it to the optimizer and backpropagate.
-
 @tf.function
 def train_step(inp, targ, enc_hidden):
     loss = 0
@@ -364,8 +336,8 @@ def evaluate(sentence):
 
 # function for plotting the attention weights
 def plot_attention(attention, sentence, predicted_sentence):
-    # Temporarily disabling
-    return None
+    # Uncomment next line to disable
+    #return None
     fig = plt.figure(figsize=(10,10))
     ax = fig.add_subplot(1, 1, 1)
     ax.matshow(attention, cmap='viridis')
@@ -378,8 +350,9 @@ def plot_attention(attention, sentence, predicted_sentence):
     ax.xaxis.set_major_locator(ticker.MultipleLocator(1))
     ax.yaxis.set_major_locator(ticker.MultipleLocator(1))
 
-    #plt.show()
-    plt.savefig('figure.png')
+    plt.show()
+    # Uncomment this line to save as a file instead of showing
+    #plt.savefig('figure.png')
 
 def translate(sentence):
     result, sentence, attention_plot = evaluate(sentence)
@@ -413,8 +386,6 @@ def main():
     print(preprocess_sentence(target_sentence))
     print(preprocess_sentence(source_sentence).encode('utf-8'))
 
-    #target = [preprocess_sentence(i[1]) for i in pairs]
-    #source = [preprocess_sentence(i[0]) for i in pairs]
     source = [tokenize_python(i[0]) for i in pairs]
     target = [preprocess_sentence(i[1]) for i in pairs]
     # Very quick and dirty removal of errored input
@@ -430,9 +401,6 @@ def main():
     max_length_targ, max_length_inp = target_tensor.shape[1], input_tensor.shape[1]
 
     # Creating training and validation sets using an 80-20 split
-    # This line was crashing for me, not sure why, just replaced with slices for now
-    #input_tensor_train, input_tensor_val, target_tensor_train, target_tensor_val =\
-            #train_test_split(input_tensor, target_tensor, test_size=0.2)
     input_tensor_train = input_tensor[:SPLIT]
     input_tensor_val = input_tensor[SPLIT:]
     target_tensor_train = target_tensor[:SPLIT]
@@ -448,29 +416,14 @@ def main():
     print ("Target Language; index to word mapping")
     convert(targ_lang, target_tensor_train[0])
 
-    #config = tf.compat.v1.ConfigProto()
-    # Dynamically grow GPU memory
-    #config.gpu_options.allow_growth = True
-    #gpus = tf.config.experimental.list_physical_devices('GPU')
-    #print(gpus)
-    #if gpus:
-        #try:
-        #tf.config.experimental.set_virtual_device_configuration(gpus[0], [tf.config.experimental.VirtualDeviceConfiguration(per_process_gpu_memory_fraction=0.8)])
-        #tf.config.experimental.set_virtual_device_configuration(gpus[1], [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=7000)])
-        #except RuntimeError as e:
-            #print(e)
-    #set_session(tf.compat.v1.Session(config=config))
-    from tensorflow.compat.v1 import ConfigProto
-    from tensorflow.compat.v1 import InteractiveSession
-
+    # Limit GPU memory if relevant
     config = ConfigProto()
     config.gpu_options.per_process_gpu_memory_fraction = MEM_FRAC
     config.gpu_options.allow_growth = True
     session = InteractiveSession(config=config)
+
     BUFFER_SIZE = len(input_tensor_train)
     steps_per_epoch = len(input_tensor_train)//BATCH_SIZE
-    #embedding_dim = 256
-    #units = 1024
     embedding_dim = EMBEDDING_DIM
     units = UNITS
     vocab_inp_size = len(inp_lang.word_index)+1
@@ -517,7 +470,9 @@ def main():
     checkpoint = tf.train.Checkpoint(optimizer=optimizer,
             encoder=encoder, decoder=decoder)
 
-    """
+    # The following section trains the model, if you want to load
+    # an already trained model comment it out
+    ##########################TRAINING##############
     for epoch in range(EPOCHS):
         start = time.time()
 
@@ -539,26 +494,13 @@ def main():
             total_loss / steps_per_epoch))
         print('Time taken for 1 epoch {} sec\n'.format(time.time() - start))
     # restoring the latest checkpoint in checkpoint_dir
-    """
+    ##########################TRAINING##############
     checkpoint.restore(tf.train.latest_checkpoint(checkpoint_dir))
 
-    #translate(u'print("Hello, world!")')
-    #sent = """
-    #    def __init__(self, inputCol=None, outputCol=None):
-#
-#                super(DutchAnalyzerLucene, self).__init__()
-#                kwargs = self._input_kwargs
-#                self.setParams(**kwargs)
-#            """
-    #sent = u'{0}'.format(pairs[0][0])
-    #translate(sent)
-
+    # Prints the results for 100 testing samples
     for i in range(SPLIT+1, SPLIT+101):
         sent = pairs[i][0]
-        #try:
         translate(sent)
-        #except TypeError:
-            #print('Error: Could not tokenize')
 
 if __name__ == '__main__':
     main()
